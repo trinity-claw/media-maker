@@ -59,10 +59,11 @@ class SafetySettings(BaseModel):
 
 class KieProviderSettings(BaseModel):
     enabled: bool = True
-    image_endpoint: str = "https://api.kie.ai/v1/images/generate"
-    upload_endpoint: str = "https://api.kie.ai/v1/files/upload"
-    video_endpoint: str = "https://api.kie.ai/v1/videos/generate"
-    timeout_seconds: int = 120
+    image_endpoint: str = "https://api.kie.ai/api/v1/jobs/createTask"
+    task_status_endpoint: str = "https://api.kie.ai/api/v1/jobs/recordInfo"
+    upload_endpoint: str = "https://kieai.redpandaai.co/api/file-stream-upload"
+    video_endpoint: str = "https://api.kie.ai/api/v1/jobs/createTask"
+    timeout_seconds: int = 240
 
 
 class GoogleProviderSettings(BaseModel):

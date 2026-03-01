@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
+import mimetypes
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -51,6 +53,7 @@ def _generate_with_google(
     output_path: Path,
     settings: AppSettings,
     secrets: RuntimeSecrets,
+    refs: list[str],
 ) -> None:
     if not secrets.google_api_key:
         raise ValueError("GOOGLE_API_KEY is required for google provider.")
@@ -58,21 +61,46 @@ def _generate_with_google(
     endpoint = settings.providers.google.image_endpoint_template.format(
         model=settings.providers.google.image_model
     )
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": (
-                            f"{prompt.dense_prompt}\n\n"
-                            f"Negative prompt: {prompt.negative_prompt}\n"
-                            f"Aspect ratio: {prompt.settings.aspect_ratio}\n"
-                            f"Resolution target: {prompt.settings.resolution}\n"
-                        )
+    parts: list[dict[str, Any]] = []
+    if refs:
+        first_ref = refs[0]
+        data_bytes: bytes | None = None
+        mime_type: str | None = None
+
+        local_candidate = Path(first_ref)
+        if local_candidate.exists() and local_candidate.is_file():
+            data_bytes = local_candidate.read_bytes()
+            mime_type = mimetypes.guess_type(local_candidate.name)[0] or "image/png"
+        elif first_ref.lower().startswith(("http://", "https://")):
+            response = requests.get(first_ref, timeout=60)
+            response.raise_for_status()
+            data_bytes = response.content
+            mime_type = response.headers.get("Content-Type") or "image/png"
+
+        if data_bytes:
+            parts.append(
+                {
+                    "inlineData": {
+                        "mimeType": mime_type,
+                        "data": base64.b64encode(data_bytes).decode("ascii"),
                     }
-                ]
-            }
-        ],
+                }
+            )
+
+    parts.append(
+        {
+            "text": (
+                f"{prompt.dense_prompt}\n\n"
+                f"Negative prompt: {prompt.negative_prompt}\n"
+                f"Aspect ratio: {prompt.settings.aspect_ratio}\n"
+                f"Resolution target: {prompt.settings.resolution}\n"
+                "Preserve subject count and action exactly when references are provided."
+            )
+        }
+    )
+
+    payload = {
+        "contents": [{"parts": parts}],
         "generationConfig": {"responseModalities": ["image", "text"]},
     }
     response = requests.post(
@@ -114,14 +142,32 @@ def _generate_with_kie(
     if not secrets.kie_api_key:
         raise ValueError("KIE_API_KEY is required for kie provider.")
 
+    def _to_kie_resolution(raw: str) -> str:
+        value = raw.strip().lower()
+        if value in {"4k", "4096x4096"}:
+            return "4K"
+        if "2048" in value or value in {"2k", "2048x2048"}:
+            return "2K"
+        return "1K"
+
+    remote_refs = [ref for ref in reference_images if ref.lower().startswith(("http://", "https://"))]
     payload = {
-        "prompt": prompt.dense_prompt,
-        "negative_prompt": prompt.negative_prompt,
-        "resolution": prompt.settings.resolution,
-        "aspect_ratio": prompt.settings.aspect_ratio,
-        "reference_images": reference_images,
+        "model": "nano-banana-2",
+        "input": {
+            "prompt": (
+                f"{prompt.dense_prompt}\n\n"
+                f"Negative prompt: {prompt.negative_prompt}\n"
+                "Maintain realistic proportions and avoid over-stylization."
+            ),
+            "google_search": False,
+            "resolution": _to_kie_resolution(prompt.settings.resolution),
+            "output_format": "png",
+            "aspect_ratio": prompt.settings.aspect_ratio or "auto",
+            "image_input": remote_refs,
+        },
+        "config": {"webhookConfig": {"endpoint": "", "secret": ""}},
     }
-    response = requests.post(
+    task_response = requests.post(
         settings.providers.kie.image_endpoint,
         headers={
             "Authorization": f"Bearer {secrets.kie_api_key}",
@@ -130,8 +176,57 @@ def _generate_with_kie(
         json=payload,
         timeout=settings.providers.kie.timeout_seconds,
     )
-    response.raise_for_status()
-    image_bytes = _extract_kie_image(response.json() or {})
+    task_response.raise_for_status()
+    task_payload = task_response.json() or {}
+    if int(task_payload.get("code", 500)) != 200:
+        raise ValueError(task_payload.get("msg") or "Kie createTask failed")
+    task_id = str((task_payload.get("data", {}) or {}).get("taskId", "")).strip()
+    if not task_id:
+        raise ValueError("Kie createTask response missing taskId")
+
+    deadline = time.time() + settings.providers.kie.timeout_seconds
+    result_payload: dict[str, Any] | None = None
+    while time.time() < deadline:
+        status_response = requests.get(
+            settings.providers.kie.task_status_endpoint,
+            headers={"Authorization": f"Bearer {secrets.kie_api_key}"},
+            params={"taskId": task_id},
+            timeout=60,
+        )
+        status_response.raise_for_status()
+        status_payload = status_response.json() or {}
+        data = status_payload.get("data", {}) or {}
+        state = str(data.get("state", "")).lower()
+        if state == "success":
+            result_payload = status_payload
+            break
+        if state in {"fail", "failed"}:
+            raise ValueError(data.get("failMsg") or "Kie generation failed")
+        time.sleep(3)
+
+    if result_payload is None:
+        raise TimeoutError("Kie image generation timed out while polling task status.")
+
+    data = result_payload.get("data", {}) or {}
+    result_json_raw = data.get("resultJson")
+    if not result_json_raw:
+        result_json_raw = (data.get("response", {}) or {}).get("resultJson")
+    parsed_result: dict[str, Any] = {}
+    if isinstance(result_json_raw, str) and result_json_raw.strip():
+        try:
+            parsed_result = json.loads(result_json_raw)
+        except json.JSONDecodeError:
+            parsed_result = {}
+    elif isinstance(result_json_raw, dict):
+        parsed_result = result_json_raw
+
+    result_urls = parsed_result.get("resultUrls") or []
+    if not result_urls:
+        raise ValueError("Kie task completed but no resultUrls were returned.")
+    image_url = str(result_urls[0])
+    image_download = requests.get(image_url, timeout=120)
+    image_download.raise_for_status()
+    image_bytes = image_download.content
     ensure_dir(output_path.parent)
     output_path.write_bytes(image_bytes)
 
@@ -154,7 +249,13 @@ def generate_single(
         _write_placeholder_image(output_path)
     else:
         if provider == "google":
-            _generate_with_google(prompt=canonical, output_path=output_path, settings=settings, secrets=secrets)
+            _generate_with_google(
+                prompt=canonical,
+                output_path=output_path,
+                settings=settings,
+                secrets=secrets,
+                refs=refs,
+            )
         elif provider == "kie":
             _generate_with_kie(
                 prompt=canonical,

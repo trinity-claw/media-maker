@@ -1,4 +1,4 @@
-project:
+﻿project:
   name: media-maker
   locale: pt-BR
   timezone: America/Sao_Paulo
@@ -22,7 +22,7 @@ generation:
     - google
   max_batch_cost_usd: 20.0
   require_explicit_cost_confirmation: true
-  dry_run: true
+  dry_run: false
 
 brand:
   name: Convexe
@@ -43,13 +43,14 @@ safety:
 providers:
   kie:
     enabled: true
-    image_endpoint: https://api.kie.ai/v1/images/generate
-    upload_endpoint: https://api.kie.ai/v1/files/upload
-    video_endpoint: https://api.kie.ai/v1/videos/generate
-    timeout_seconds: 120
+    image_endpoint: https://api.kie.ai/api/v1/jobs/createTask
+    task_status_endpoint: https://api.kie.ai/api/v1/jobs/recordInfo
+    upload_endpoint: https://kieai.redpandaai.co/api/file-stream-upload
+    video_endpoint: https://api.kie.ai/api/v1/jobs/createTask
+    timeout_seconds: 240
   google:
     enabled: true
-    image_model: gemini-2.0-flash-preview-image-generation
+    image_model: gemini-3.1-flash-image-preview
     image_endpoint_template: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
     video_model: veo-3.1
     video_endpoint_template: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateVideo
@@ -66,3 +67,5 @@ assets:
   mockup_angles_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups\Mock Ups - Frame Angles\Atualizados'
   mockup_front_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups\Mock Ups - Frame Front\Atualizados'
   environments_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups\Mockups em ambientes\1800x1800\Novo'
+
+

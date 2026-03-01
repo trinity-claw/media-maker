@@ -44,8 +44,12 @@ def prepare_reference_urls(
         candidate = Path(raw_path).expanduser().resolve()
         if not candidate.exists():
             raise FileNotFoundError(f"Mockup path not found: {candidate}")
-        uploaded_url = uploader.upload_file(candidate)
-        urls.append(uploaded_url)
+        try:
+            uploaded_url = uploader.upload_file(candidate)
+            urls.append(uploaded_url)
+        except Exception:  # noqa: BLE001
+            # Fallback to local path so providers that support file inputs can still consume references.
+            urls.append(str(candidate))
     # Preserve order and de-duplicate
     deduped: list[str] = []
     seen: set[str] = set()

@@ -123,7 +123,8 @@ def cmd_catalog_lookup(args: argparse.Namespace) -> int:
 
 
 def _serialize_reference_attachments(reference_urls: list[str]) -> list[dict[str, str]]:
-    return [{"url": url} for url in reference_urls if url.strip()]
+    clean_urls = [url for url in reference_urls if url.strip().lower().startswith(("http://", "https://"))]
+    return [{"url": url} for url in clean_urls]
 
 
 def _create_campaign_batch(

@@ -29,15 +29,22 @@ class KieUploader:
                 self.upload_endpoint,
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 files={"file": (path.name, handle)},
+                data={"uploadPath": "media-maker"},
                 timeout=self.timeout_seconds,
             )
         response.raise_for_status()
         payload = response.json() or {}
+        if payload.get("success") is False:
+            message = payload.get("msg") or payload.get("message") or "unknown upload error"
+            raise ValueError(f"Kie upload failed: {message}")
+        if "code" in payload and str(payload.get("code")) not in {"200", "0"}:
+            message = payload.get("msg") or payload.get("message") or "unknown upload error"
+            raise ValueError(f"Kie upload failed: {message}")
         for key in ("url", "file_url", "public_url"):
             if key in payload and payload[key]:
                 return str(payload[key])
         data = payload.get("data", {}) or {}
-        for key in ("url", "file_url", "public_url"):
+        for key in ("url", "file_url", "public_url", "fileUrl", "downloadUrl"):
             if key in data and data[key]:
                 return str(data[key])
         raise ValueError("Upload response did not contain a public URL.")
