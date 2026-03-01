@@ -4,3 +4,4 @@ PyYAML>=6.0.2
 pydantic>=2.9.2
 tenacity>=9.0.0
 pytest>=8.3.3
+Pillow>=10.4.0

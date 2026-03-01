@@ -111,6 +111,7 @@ def build_prompt_variants(
             "Preserve natural textures and imperfections. "
             "No beautification or skin smoothing. "
             "Frame must be clean matte black, no metallic plate, no serial tag, no sticker label. "
+            "Generate one single continuous photo only. No split screen, no diptych, no collage, no before-after layout. "
             "Frame composition for paid social conversion. "
             "Premium aspirational environment, motivational mood, brand-safe. "
             f"Lighting: {lighting}. Camera setup: {lens}. "
@@ -127,6 +128,7 @@ def build_prompt_variants(
             },
             "output": {
                 "type": "single_image",
+                "layout": "single_panel",
                 "aspect_ratio": aspect_ratio,
                 "resolution": resolution,
             },
@@ -149,7 +151,8 @@ def build_prompt_variants(
                 "prompt": dense_prompt,
                 "negative_prompt": (
                     "unrealistic skin, beauty filter, plastic look, cartoon, cgi, overprocessed lighting, "
-                    "silver tag on frame, metal label on frame, sticker on frame edge"
+                    "silver tag on frame, metal label on frame, sticker on frame edge, split screen, diptych, "
+                    "triptych, collage layout, before-after split, two images in one frame"
                 ),
                 "settings": {
                     "resolution": resolution,

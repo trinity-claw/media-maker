@@ -23,6 +23,12 @@ DEFAULT_NEGATIVE_BLOCKERS = [
     "silver label plate",
     "barcode plate on frame",
     "serial tag attached to frame",
+    "split screen",
+    "diptych",
+    "triptych",
+    "multi-panel collage",
+    "before and after layout",
+    "two scenes in one image",
 ]
 
 
@@ -87,6 +93,7 @@ class GenerationItem(BaseModel):
     provider: str | None = None
     local_path: Path | None = None
     public_url: str | None = None
+    cloud_path: str | None = None
     error: str | None = None
     cost_usd: float = 0.0
 

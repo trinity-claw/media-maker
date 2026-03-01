@@ -54,6 +54,7 @@ def build_content_table_definition(table_name: str = "Content") -> dict[str, Any
             {"name": "Batch ID", "type": "singleLineText"},
             {"name": "Generation Error", "type": "multilineText"},
             {"name": "Convexe Insight Source", "type": "singleLineText"},
+            {"name": "Cloud Asset Path", "type": "singleLineText"},
         ],
     }
 
@@ -211,6 +212,7 @@ class AirtableClient:
         provider: str | None = None,
         error: str | None = None,
         video_prompt: str | None = None,
+        cloud_asset_path: str | None = None,
     ) -> dict[str, Any]:
         fields: dict[str, Any] = {}
         if image_url:
@@ -229,6 +231,8 @@ class AirtableClient:
             fields["Generation Error"] = error
         if video_prompt:
             fields["Video Prompt"] = video_prompt
+        if cloud_asset_path:
+            fields["Cloud Asset Path"] = cloud_asset_path
 
         payload = {"fields": fields}
         response = self.session.patch(

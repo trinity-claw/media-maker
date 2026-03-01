@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 import mimetypes
+import shutil
 import time
 from pathlib import Path
 from typing import Any, Callable
 
 import requests
+from PIL import Image
 
 from tools.airtable import AirtableClient
 from tools.config import AppSettings, PricingConfig, RuntimeSecrets
@@ -132,6 +135,74 @@ def _extract_kie_image(payload: dict[str, Any]) -> bytes:
     raise ValueError("Kie response did not include image bytes.")
 
 
+def _aspect_ratio_pair(ratio: str) -> tuple[int, int]:
+    left, right = ratio.split(":", maxsplit=1)
+    return int(left.strip()), int(right.strip())
+
+
+def _center_crop_to_ratio(image_bytes: bytes, target_ratio: str) -> bytes:
+    target_w, target_h = _aspect_ratio_pair(target_ratio)
+    with Image.open(io.BytesIO(image_bytes)) as image:
+        width, height = image.size
+        current = width / height
+        desired = target_w / target_h
+
+        if abs(current - desired) < 1e-4:
+            out = io.BytesIO()
+            image.save(out, format="PNG")
+            return out.getvalue()
+
+        if current > desired:
+            new_width = int(height * desired)
+            offset_x = (width - new_width) // 2
+            box = (offset_x, 0, offset_x + new_width, height)
+        else:
+            new_height = int(width / desired)
+            offset_y = (height - new_height) // 2
+            box = (0, offset_y, width, offset_y + new_height)
+
+        cropped = image.crop(box)
+        out = io.BytesIO()
+        cropped.save(out, format="PNG")
+        return out.getvalue()
+
+
+def _normalize_kie_aspect_ratio(raw_ratio: str) -> tuple[str, str | None]:
+    ratio = (raw_ratio or "").strip()
+    allowed = {
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4",
+        "4:5",
+        "5:4",
+        "3:2",
+        "2:3",
+        "21:9",
+        "9:21",
+        "auto",
+    }
+    if ratio in allowed:
+        return ratio, None
+    if ratio == "2:1":
+        return "16:9", "2:1"
+    if ratio == "1:2":
+        return "9:16", "1:2"
+    return "auto", None
+
+
+def _sync_to_cloud(local_path: Path, settings: AppSettings, batch_id: str) -> str | None:
+    if not settings.cloud_sync.enabled:
+        return None
+    cloud_root = settings.cloud_sync.root
+    ensure_dir(cloud_root)
+    target_dir = ensure_dir(cloud_root / batch_id)
+    target = target_dir / local_path.name
+    shutil.copy2(local_path, target)
+    return str(target)
+
+
 def _generate_with_kie(
     prompt: CanonicalPrompt,
     output_path: Path,
@@ -151,6 +222,8 @@ def _generate_with_kie(
         return "1K"
 
     remote_refs = [ref for ref in reference_images if ref.lower().startswith(("http://", "https://"))]
+    sent_aspect, post_crop_ratio = _normalize_kie_aspect_ratio(prompt.settings.aspect_ratio)
+
     payload = {
         "model": "nano-banana-2",
         "input": {
@@ -162,7 +235,7 @@ def _generate_with_kie(
             "google_search": False,
             "resolution": _to_kie_resolution(prompt.settings.resolution),
             "output_format": "png",
-            "aspect_ratio": prompt.settings.aspect_ratio or "auto",
+            "aspect_ratio": sent_aspect,
             "image_input": remote_refs,
         },
         "config": {"webhookConfig": {"endpoint": "", "secret": ""}},
@@ -227,6 +300,8 @@ def _generate_with_kie(
     image_download = requests.get(image_url, timeout=120)
     image_download.raise_for_status()
     image_bytes = image_download.content
+    if post_crop_ratio:
+        image_bytes = _center_crop_to_ratio(image_bytes=image_bytes, target_ratio=post_crop_ratio)
     ensure_dir(output_path.parent)
     output_path.write_bytes(image_bytes)
 
@@ -335,8 +410,38 @@ def generate_images(
             continue
 
         public_url = None
+        cloud_path = None
+        cloud_path = _sync_to_cloud(local_path=generated_asset.local_path, settings=settings, batch_id=batch_id)
+        upload_error: str | None = None
         if uploader:
-            public_url = uploader.upload_file(generated_asset.local_path)
+            try:
+                public_url = uploader.upload_file(generated_asset.local_path)
+            except Exception as exc:  # noqa: BLE001
+                upload_error = str(exc)
+
+        if upload_error:
+            failure_count += 1
+            error_message = f"upload_failed: {upload_error}"
+            if airtable and record_id:
+                airtable.update_record_assets(
+                    record_id=record_id,
+                    image_status="Rejected",
+                    error=error_message,
+                    cloud_asset_path=cloud_path,
+                )
+            result_items.append(
+                GenerationItem(
+                    record_id=record_id,
+                    ad_name=ad_name,
+                    success=False,
+                    provider=generated_asset.provider,
+                    local_path=generated_asset.local_path,
+                    cloud_path=cloud_path,
+                    error=error_message,
+                )
+            )
+            continue
+
         total_cost += generated_asset.cost_usd
         success_count += 1
 
@@ -348,6 +453,7 @@ def generate_images(
                 actual_cost=generated_asset.cost_usd,
                 provider=generated_asset.provider,
                 error="",
+                cloud_asset_path=cloud_path,
             )
 
         # Keep generation metadata side-by-side for debugging.
@@ -359,6 +465,7 @@ def generate_images(
                     "record_id": record_id,
                     "provider": generated_asset.provider,
                     "public_url": public_url,
+                    "cloud_path": cloud_path,
                     "cost_usd": generated_asset.cost_usd,
                 },
                 ensure_ascii=True,
@@ -375,6 +482,7 @@ def generate_images(
                 provider=generated_asset.provider,
                 local_path=generated_asset.local_path,
                 public_url=public_url,
+                cloud_path=cloud_path,
                 cost_usd=generated_asset.cost_usd,
             )
         )

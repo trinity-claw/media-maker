@@ -90,6 +90,13 @@ class AirtableSettings(BaseModel):
     timeout_seconds: int = 30
 
 
+class CloudSyncSettings(BaseModel):
+    enabled: bool = True
+    root: Path = Path(
+        r"G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Media Maker Outputs"
+    )
+
+
 class AssetPathsSettings(BaseModel):
     catalog_output: Path = Path("output/catalog/convexe-assets.json")
     raw_frames_root: Path = Path(
@@ -114,6 +121,7 @@ class AppSettings(BaseModel):
     safety: SafetySettings = Field(default_factory=SafetySettings)
     providers: ProvidersSettings = Field(default_factory=ProvidersSettings)
     airtable: AirtableSettings = Field(default_factory=AirtableSettings)
+    cloud_sync: CloudSyncSettings = Field(default_factory=CloudSyncSettings)
     assets: AssetPathsSettings = Field(default_factory=AssetPathsSettings)
 
 
@@ -168,6 +176,7 @@ def load_settings(path: Path | None = None) -> AppSettings:
     settings.paths.runs_root = _resolve_path(settings.paths.runs_root)
     settings.paths.image_root = _resolve_path(settings.paths.image_root)
     settings.paths.video_root = _resolve_path(settings.paths.video_root)
+    settings.cloud_sync.root = _resolve_path(settings.cloud_sync.root)
     settings.assets.catalog_output = _resolve_path(settings.assets.catalog_output)
     settings.assets.raw_frames_root = _resolve_path(settings.assets.raw_frames_root)
     settings.assets.mockup_angles_root = _resolve_path(settings.assets.mockup_angles_root)
