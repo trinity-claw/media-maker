@@ -18,6 +18,7 @@ BRAND_CONSTRAINTS = [
     "convexe premium motivational direction",
     "aspirational but brand-safe tone",
     "optional contemporary renaissance vandalized cues",
+    "frame must be clean matte black with no stickers, no silver tags, no metal labels",
 ]
 
 
@@ -109,6 +110,7 @@ def build_prompt_variants(
             f"Visual direction: {style_hint}, variation style: {style}. "
             "Preserve natural textures and imperfections. "
             "No beautification or skin smoothing. "
+            "Frame must be clean matte black, no metallic plate, no serial tag, no sticker label. "
             "Frame composition for paid social conversion. "
             "Premium aspirational environment, motivational mood, brand-safe. "
             f"Lighting: {lighting}. Camera setup: {lens}. "
@@ -136,6 +138,8 @@ def build_prompt_variants(
                 "no_professional_retouching": True,
                 "no_ai_beauty_filters": True,
                 "no_studio_lighting": False,
+                "no_frame_labels_or_tags": True,
+                "no_metal_serial_plates": True,
             },
         }
         canonical = normalize_prompt_schema(
@@ -144,7 +148,8 @@ def build_prompt_variants(
                 "mode": mode,
                 "prompt": dense_prompt,
                 "negative_prompt": (
-                    "unrealistic skin, beauty filter, plastic look, cartoon, cgi, overprocessed lighting"
+                    "unrealistic skin, beauty filter, plastic look, cartoon, cgi, overprocessed lighting, "
+                    "silver tag on frame, metal label on frame, sticker on frame edge"
                 ),
                 "settings": {
                     "resolution": resolution,

@@ -18,6 +18,11 @@ DEFAULT_NEGATIVE_BLOCKERS = [
     "cartoon",
     "cgi",
     "oversaturated colors",
+    "frame stickers",
+    "metal tags on frame",
+    "silver label plate",
+    "barcode plate on frame",
+    "serial tag attached to frame",
 ]
 
 
