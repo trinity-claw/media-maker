@@ -1,0 +1,16 @@
+.claude/.env
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+*.pyo
+*.pyd
+*.log
+output/images/
+output/videos/
+output/runs/
+output/batches/
+!output/images/.gitkeep
+!output/videos/.gitkeep
+!output/runs/.gitkeep
+!output/batches/.gitkeep

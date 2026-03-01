@@ -1,0 +1,61 @@
+project:
+  name: media-maker
+  locale: pt-BR
+  timezone: America/Sao_Paulo
+
+paths:
+  convexe_meta_ads_root: ../convexe-openclaw-marketing-team/output/meta-ads
+  references_root: references/inputs
+  output_root: output
+  batch_root: output/batches
+  runs_root: output/runs
+  image_root: output/images
+  video_root: output/videos
+
+generation:
+  default_mode: txt2img
+  default_resolution: 1024x1792
+  default_aspect_ratio: "4:5"
+  default_prompt_schema: hybrid
+  default_provider_order:
+    - kie
+    - google
+  max_batch_cost_usd: 20.0
+  require_explicit_cost_confirmation: true
+  dry_run: true
+
+brand:
+  name: Convexe
+  strategy_mode: motivational_first
+  default_collections:
+    - motivacionais_inspiradores
+    - renascentistas
+    - esculturas
+    - cultura_pop
+
+safety:
+  synthetic_personas_only: true
+  forbid_real_people_likeness: true
+  forbid_beauty_filters: true
+  forbid_professional_retouch: true
+  forbid_fake_studio_when_documentary: true
+
+providers:
+  kie:
+    enabled: true
+    image_endpoint: https://api.kie.ai/v1/images/generate
+    upload_endpoint: https://api.kie.ai/v1/files/upload
+    video_endpoint: https://api.kie.ai/v1/videos/generate
+    timeout_seconds: 120
+  google:
+    enabled: true
+    image_model: gemini-2.0-flash-preview-image-generation
+    image_endpoint_template: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+    video_model: veo-3.1
+    video_endpoint_template: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateVideo
+    timeout_seconds: 180
+
+airtable:
+  table_name: Content
+  page_size: 100
+  timeout_seconds: 30
