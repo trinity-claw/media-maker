@@ -27,6 +27,18 @@ Voce e o operador do Media-Maker para gerar criativos ultra-realistas da Convexe
    - gerar com fallback entre providers
    - anexar URL no Airtable e marcar `Generated`
 
+## Fluxo de ingestao manual (1 comando)
+
+Comando alvo:
+- `python -m tools.cli ingest run --frame-code ... --frame-name ... --mockup-path ... --confirm-cost`
+
+Processo:
+1. Resolver produto por codigo/nome.
+2. Subir mockup local para URL publica.
+3. Inferir modo `img2img` quando houver referencia.
+4. Criar batch + registros Pending no Airtable.
+5. Gerar imagens no mesmo fluxo com custo confirmado.
+
 ## Fluxo de video
 
 1. Buscar registros com `Image Status=Approved`

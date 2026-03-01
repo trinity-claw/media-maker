@@ -51,8 +51,29 @@ python -m tools.cli validate-config
 python -m tools.cli airtable setup
 python -m tools.cli campaign create --product "Quadro Atlas" --variations 5 --style "premium documentary"
 python -m tools.cli image generate --batch-id <id> --confirm-cost
+python -m tools.cli ingest run --frame-code CX001 --frame-name "Atlas" --mockup-path references/inputs/atlas.png --variations 3 --confirm-cost
 python -m tools.cli status
 python -m tools.cli video generate --from-approved --confirm-cost
+```
+
+## Ingestao Manual (novo)
+
+Use quando quiser rodar tudo com um unico comando a partir de quadro Convexe:
+
+- aceita `--frame-code` e/ou `--frame-name`
+- aceita `--mockup-path` (arquivo local) e/ou `--mockup-url`
+- cria registros no Airtable + batch local + gera imagens automaticamente
+
+Exemplo:
+
+```bash
+python -m tools.cli ingest run ^
+  --frame-code CX145 ^
+  --frame-name "Leao Imperial" ^
+  --mockup-path references/inputs/leao-imperial-mockup.jpg ^
+  --style "premium documentary realism" ^
+  --variations 4 ^
+  --confirm-cost
 ```
 
 ## Dry Run
