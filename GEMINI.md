@@ -34,10 +34,11 @@ Comando alvo:
 
 Processo:
 1. Resolver produto por codigo/nome.
-2. Subir mockup local para URL publica.
-3. Inferir modo `img2img` quando houver referencia.
-4. Criar batch + registros Pending no Airtable.
-5. Gerar imagens no mesmo fluxo com custo confirmado.
+2. Se `frame-number` for informado, buscar refs automaticamente no catalogo local.
+3. Subir mockup local para URL publica.
+4. Inferir modo `img2img` quando houver referencia.
+5. Criar batch + registros Pending no Airtable.
+6. Gerar imagens no mesmo fluxo com custo confirmado.
 
 ## Fluxo de video
 

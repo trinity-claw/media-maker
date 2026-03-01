@@ -59,3 +59,10 @@ airtable:
   table_name: Content
   page_size: 100
   timeout_seconds: 30
+
+assets:
+  catalog_output: output/catalog/convexe-assets.json
+  raw_frames_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups'
+  mockup_angles_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups\Mock Ups - Frame Angles\Atualizados'
+  mockup_front_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups\Mock Ups - Frame Front\Atualizados'
+  environments_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups\Mockups em ambientes\1800x1800\Novo'

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
@@ -82,7 +83,8 @@ class AirtableClient:
         return f"{base}{suffix}"
 
     def _data_url(self) -> str:
-        return f"https://api.airtable.com/v0/{self.credentials.base_id}/{self.table_name}"
+        table_ref = quote(self.table_name, safe="")
+        return f"https://api.airtable.com/v0/{self.credentials.base_id}/{table_ref}"
 
     def list_tables(self) -> list[dict[str, Any]]:
         response = self.session.get(
@@ -96,9 +98,29 @@ class AirtableClient:
 
     def setup_content_table(self) -> dict[str, Any]:
         tables = self.list_tables()
+        existing_table: dict[str, Any] | None = None
         for table in tables:
-            if table.get("name") == self.table_name:
-                return table
+            if table.get("name") == self.table_name or table.get("id") == self.table_name:
+                existing_table = table
+                break
+
+        if existing_table is not None:
+            table_id = str(existing_table.get("id", "")).strip()
+            self._ensure_required_fields(
+                table_id=table_id,
+                existing_table=existing_table,
+                expected_fields=build_content_table_definition(table_name="Content")["fields"],
+            )
+            refreshed = self.list_tables()
+            for table in refreshed:
+                if table.get("id") == table_id:
+                    return table
+            return existing_table
+
+        if self.table_name.startswith("tbl"):
+            raise ValueError(
+                f"Configured AIRTABLE_TABLE_ID {self.table_name} not found in this base."
+            )
 
         payload = build_content_table_definition(table_name=self.table_name)
         response = self.session.post(
@@ -109,6 +131,24 @@ class AirtableClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def _ensure_required_fields(
+        self,
+        *,
+        table_id: str,
+        existing_table: dict[str, Any],
+        expected_fields: list[dict[str, Any]],
+    ) -> None:
+        existing_names = {field.get("name") for field in existing_table.get("fields", [])}
+        missing = [field for field in expected_fields if field.get("name") not in existing_names]
+        for field_def in missing:
+            response = self.session.post(
+                self._meta_url(f"/tables/{table_id}/fields"),
+                headers=self._headers,
+                json=field_def,
+                timeout=self.timeout_seconds,
+            )
+            response.raise_for_status()
 
     def create_content_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         created: list[dict[str, Any]] = []

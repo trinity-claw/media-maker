@@ -10,6 +10,7 @@ output/images/
 output/videos/
 output/runs/
 output/batches/
+output/catalog/
 !output/images/.gitkeep
 !output/videos/.gitkeep
 !output/runs/.gitkeep

@@ -42,6 +42,7 @@ Preencha `.claude/.env` com:
 - `KIE_API_KEY`
 - `AIRTABLE_API_KEY`
 - `AIRTABLE_BASE_ID`
+- `AIRTABLE_TABLE_ID` (opcional, recomendado quando ja existe tabela)
 
 ## Comandos CLI
 
@@ -49,9 +50,12 @@ Preencha `.claude/.env` com:
 python -m tools.cli init
 python -m tools.cli validate-config
 python -m tools.cli airtable setup
+python -m tools.cli catalog build
+python -m tools.cli catalog lookup --frame-code 12
 python -m tools.cli campaign create --product "Quadro Atlas" --variations 5 --style "premium documentary"
 python -m tools.cli image generate --batch-id <id> --confirm-cost
 python -m tools.cli ingest run --frame-code CX001 --frame-name "Atlas" --mockup-path references/inputs/atlas.png --variations 3 --confirm-cost
+python -m tools.cli ingest run --frame-number 12 --variations 3 --confirm-cost
 python -m tools.cli status
 python -m tools.cli video generate --from-approved --confirm-cost
 ```
@@ -61,6 +65,7 @@ python -m tools.cli video generate --from-approved --confirm-cost
 Use quando quiser rodar tudo com um unico comando a partir de quadro Convexe:
 
 - aceita `--frame-code` e/ou `--frame-name`
+- aceita `--frame-number` para buscar assets automaticamente no catalogo
 - aceita `--mockup-path` (arquivo local) e/ou `--mockup-url`
 - cria registros no Airtable + batch local + gera imagens automaticamente
 

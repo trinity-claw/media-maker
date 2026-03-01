@@ -5,6 +5,12 @@ from collections import Counter
 from typing import Any
 
 from tools.airtable import AirtableClient, AirtableCredentials
+from tools.asset_catalog import (
+    build_asset_catalog,
+    load_asset_catalog,
+    pick_reference_files_for_frame,
+    save_asset_catalog,
+)
 from tools.config import load_pricing, load_runtime_secrets, load_settings
 from tools.costs import assert_budget_or_raise, estimate_image_batch_cost
 from tools.image_gen import generate_images
@@ -20,12 +26,13 @@ def _make_airtable_client() -> AirtableClient:
     settings = load_settings()
     secrets = load_runtime_secrets()
     secrets.require("airtable_api_key", "airtable_base_id")
+    table_ref = secrets.airtable_table_id or settings.airtable.table_name
     return AirtableClient(
         credentials=AirtableCredentials(
             api_key=secrets.airtable_api_key,
             base_id=secrets.airtable_base_id,
         ),
-        table_name=settings.airtable.table_name,
+        table_name=table_ref,
         timeout_seconds=settings.airtable.timeout_seconds,
     )
 
@@ -71,7 +78,47 @@ def cmd_validate_config(_: argparse.Namespace) -> int:
 def cmd_airtable_setup(_: argparse.Namespace) -> int:
     client = _make_airtable_client()
     table = client.setup_content_table()
-    print(f"OK: tabela pronta em Airtable -> {table.get('name', 'Content')}")
+    print(
+        "OK: tabela pronta em Airtable -> "
+        f"{table.get('name', 'Content')} ({table.get('id', 'id-unavailable')})"
+    )
+    return 0
+
+
+def cmd_catalog_build(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    catalog = build_asset_catalog(settings)
+    output = save_asset_catalog(catalog=catalog, output_path=settings.assets.catalog_output)
+    totals = catalog.get("totals", {})
+    print(f"OK: catalogo gerado em {output}")
+    print(
+        "Totais: "
+        f"assets={totals.get('all_assets', 0)}, "
+        f"mapeados={totals.get('mapped_assets', 0)}, "
+        f"frames={totals.get('frames', 0)}, "
+        f"unknown={totals.get('unknown_assets', 0)}"
+    )
+    return 0
+
+
+def cmd_catalog_lookup(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    catalog_path = settings.assets.catalog_output
+    if not catalog_path.exists():
+        catalog = build_asset_catalog(settings)
+        save_asset_catalog(catalog=catalog, output_path=catalog_path)
+    catalog = load_asset_catalog(catalog_path)
+    frame = catalog.get("frames", {}).get(args.frame_code)
+    if not frame:
+        print(f"Nenhum item encontrado para frame_code={args.frame_code}")
+        return 0
+    print(f"Frame: {frame.get('frame_code')} | Label: {frame.get('preferred_label')}")
+    assets = frame.get("assets", {})
+    for kind in ("mockup_front", "mockup_angle", "raw", "environment"):
+        values = list(assets.get(kind, []))
+        print(f"- {kind}: {len(values)}")
+        for row in values[: args.limit]:
+            print(f"  {row}")
     return 0
 
 
@@ -273,13 +320,34 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
     uploader = _make_uploader()
     context = load_convexe_context(settings.paths.convexe_meta_ads_root)
 
+    catalog_path = settings.assets.catalog_output
+    catalog: dict[str, Any] | None = None
+    catalog_frame: dict[str, Any] | None = None
+    resolved_frame_code = args.frame_number or args.frame_code
+
+    if resolved_frame_code:
+        if not catalog_path.exists():
+            generated_catalog = build_asset_catalog(settings)
+            save_asset_catalog(catalog=generated_catalog, output_path=catalog_path)
+        catalog = load_asset_catalog(catalog_path)
+        catalog_frame = catalog.get("frames", {}).get(str(resolved_frame_code))
+
+    auto_paths: list[str] = []
+    if catalog_frame and not args.no_auto_from_catalog:
+        auto_paths = pick_reference_files_for_frame(
+            catalog=catalog,
+            frame_code=str(resolved_frame_code),
+            max_files=args.max_catalog_files,
+        )
+
     product = compose_product_name(
-        frame_code=args.frame_code,
-        frame_name=args.frame_name,
+        frame_code=str(resolved_frame_code) if resolved_frame_code else None,
+        frame_name=args.frame_name or (catalog_frame or {}).get("preferred_label"),
         product=args.product,
     )
+    all_mockup_paths = list(args.mockup_path or []) + auto_paths
     reference_urls = prepare_reference_urls(
-        mockup_paths=args.mockup_path or [],
+        mockup_paths=all_mockup_paths,
         mockup_urls=args.mockup_url or [],
         uploader=uploader,
     )
@@ -330,6 +398,8 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
             "batch_id": campaign["batch_id"],
             "product": product,
             "mode": mode,
+            "resolved_frame_code": resolved_frame_code,
+            "auto_catalog_paths": auto_paths,
             "reference_urls": reference_urls,
             "estimate_total_usd": estimate.total_usd,
             "generation_result": result.model_dump(mode="json"),
@@ -337,6 +407,8 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
     )
     print(f"OK: ingestao automatica concluida. Batch ID: {campaign['batch_id']}")
     print(f"Produto: {product} | modo: {mode}")
+    if resolved_frame_code:
+        print(f"Frame code: {resolved_frame_code} | catalog auto: {len(auto_paths)} refs")
     print(f"Registros criados: {campaign['records_created']} | geradas: {result.success_count}")
     print(f"Custo estimado: USD {estimate.total_usd:.2f} | custo real: USD {result.total_cost_usd:.2f}")
     print(f"Audit: {audit_path}")
@@ -412,6 +484,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_airtable_setup = p_airtable_sub.add_parser("setup", help="Cria/valida tabela Content.")
     p_airtable_setup.set_defaults(func=cmd_airtable_setup)
 
+    p_catalog = sub.add_parser("catalog", help="Catalogo local de assets Convexe.")
+    p_catalog_sub = p_catalog.add_subparsers(dest="catalog_command")
+    p_catalog_build = p_catalog_sub.add_parser("build", help="Escaneia pastas e gera catalogo JSON.")
+    p_catalog_build.set_defaults(func=cmd_catalog_build)
+    p_catalog_lookup = p_catalog_sub.add_parser("lookup", help="Consulta assets por frame code.")
+    p_catalog_lookup.add_argument("--frame-code", required=True)
+    p_catalog_lookup.add_argument("--limit", type=int, default=5)
+    p_catalog_lookup.set_defaults(func=cmd_catalog_lookup)
+
     p_campaign = sub.add_parser("campaign", help="Operacoes de campanha.")
     p_campaign_sub = p_campaign.add_subparsers(dest="campaign_command")
     p_campaign_create = p_campaign_sub.add_parser("create", help="Cria batch e registros Pending.")
@@ -443,6 +524,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Recebe codigo/nome/mockup e executa create+generate em um fluxo unico.",
     )
     p_ingest_run.add_argument("--frame-code", default=None)
+    p_ingest_run.add_argument("--frame-number", default=None)
     p_ingest_run.add_argument("--frame-name", default=None)
     p_ingest_run.add_argument("--product", default=None)
     p_ingest_run.add_argument("--style", default="premium documentary realism")
@@ -455,6 +537,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest_run.add_argument("--primary-provider", default=None, choices=["kie", "google"])
     p_ingest_run.add_argument("--mockup-path", action="append", default=[])
     p_ingest_run.add_argument("--mockup-url", action="append", default=[])
+    p_ingest_run.add_argument("--no-auto-from-catalog", action="store_true")
+    p_ingest_run.add_argument("--max-catalog-files", type=int, default=3)
     p_ingest_run.add_argument("--confirm-cost", action="store_true")
     p_ingest_run.add_argument("--allow-over-budget", action="store_true")
     p_ingest_run.add_argument("--provider-order", nargs="+", default=None)

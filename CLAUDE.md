@@ -31,10 +31,11 @@ Transformar briefing de produto em:
 ### Manual Ingestion Workflow (quadro Convexe)
 
 1. Receber `frame-code`/`frame-name` e mockup local (ou URL).
-2. Converter mockup para URL publica.
-3. Criar campanha e prompts automaticamente.
-4. Gerar imagens no mesmo comando com confirmacao de custo.
-5. Persistir tudo no Airtable e no `output/batches`.
+2. Quando houver `frame-number`, tentar refs automaticas via catalogo.
+3. Converter mockup para URL publica.
+4. Criar campanha e prompts automaticamente.
+5. Gerar imagens no mesmo comando com confirmacao de custo.
+6. Persistir tudo no Airtable e no `output/batches`.
 
 ### Video Generation Workflow
 
