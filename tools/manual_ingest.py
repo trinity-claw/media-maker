@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from math import gcd
 from pathlib import Path
+
+from PIL import Image
 
 from tools.upload import KieUploader
 
@@ -59,3 +62,20 @@ def prepare_reference_urls(
         seen.add(url)
         deduped.append(url)
     return deduped
+
+
+def infer_frame_ratio_from_mockup_paths(mockup_paths: list[str]) -> str | None:
+    for raw_path in mockup_paths:
+        candidate = Path(raw_path).expanduser().resolve()
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        try:
+            with Image.open(candidate) as image:
+                width, height = image.size
+            if width <= 0 or height <= 0:
+                continue
+            factor = gcd(width, height)
+            return f"{width // factor}:{height // factor}"
+        except Exception:  # noqa: BLE001
+            continue
+    return None

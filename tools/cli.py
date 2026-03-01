@@ -15,7 +15,12 @@ from tools.config import load_pricing, load_runtime_secrets, load_settings
 from tools.costs import assert_budget_or_raise, estimate_image_batch_cost
 from tools.image_gen import generate_images
 from tools.intel_ingest import load_convexe_context
-from tools.manual_ingest import compose_product_name, infer_mode, prepare_reference_urls
+from tools.manual_ingest import (
+    compose_product_name,
+    infer_frame_ratio_from_mockup_paths,
+    infer_mode,
+    prepare_reference_urls,
+)
 from tools.prompt_engine import build_prompt_variants
 from tools.upload import KieUploader
 from tools.utils import ensure_dir, now_utc_slug, read_json, slugify, write_json
@@ -139,6 +144,7 @@ def _create_campaign_batch(
     batch_id: str | None,
     primary_provider: str | None,
     reference_urls: list[str],
+    frame_ratio_lock: str | None,
     settings: Any,
     pricing: Any,
     client: AirtableClient,
@@ -151,6 +157,7 @@ def _create_campaign_batch(
         "resolution": resolution,
         "aspect_ratio": aspect_ratio,
         "copy_ptbr": copy_text,
+        "frame_ratio_lock": frame_ratio_lock,
     }
     prompts = build_prompt_variants(brief=brief, brand_context=context, n=variations)
     if not prompts:
@@ -240,6 +247,7 @@ def cmd_campaign_create(args: argparse.Namespace) -> int:
         batch_id=args.batch_id,
         primary_provider=args.primary_provider,
         reference_urls=args.reference or [],
+        frame_ratio_lock=None,
         settings=settings,
         pricing=pricing,
         client=client,
@@ -347,6 +355,7 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
         product=args.product,
     )
     all_mockup_paths = list(args.mockup_path or []) + auto_paths
+    frame_ratio_lock = infer_frame_ratio_from_mockup_paths(all_mockup_paths)
     reference_urls = prepare_reference_urls(
         mockup_paths=all_mockup_paths,
         mockup_urls=args.mockup_url or [],
@@ -365,6 +374,7 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
         batch_id=args.batch_id,
         primary_provider=args.primary_provider,
         reference_urls=reference_urls,
+        frame_ratio_lock=frame_ratio_lock,
         settings=settings,
         pricing=pricing,
         client=client,
@@ -402,6 +412,7 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
             "resolved_frame_code": resolved_frame_code,
             "auto_catalog_paths": auto_paths,
             "reference_urls": reference_urls,
+            "frame_ratio_lock": frame_ratio_lock,
             "estimate_total_usd": estimate.total_usd,
             "generation_result": result.model_dump(mode="json"),
         },
@@ -410,6 +421,8 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
     print(f"Produto: {product} | modo: {mode}")
     if resolved_frame_code:
         print(f"Frame code: {resolved_frame_code} | catalog auto: {len(auto_paths)} refs")
+    if frame_ratio_lock:
+        print(f"Frame ratio lock: {frame_ratio_lock}")
     print(f"Registros criados: {campaign['records_created']} | geradas: {result.success_count}")
     print(f"Custo estimado: USD {estimate.total_usd:.2f} | custo real: USD {result.total_cost_usd:.2f}")
     print(f"Audit: {audit_path}")

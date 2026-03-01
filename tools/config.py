@@ -64,6 +64,9 @@ class KieProviderSettings(BaseModel):
     upload_endpoint: str = "https://kieai.redpandaai.co/api/file-stream-upload"
     video_endpoint: str = "https://api.kie.ai/api/v1/jobs/createTask"
     timeout_seconds: int = 240
+    request_retries: int = 3
+    retry_backoff_seconds: float = 2.0
+    poll_interval_seconds: int = 3
 
 
 class GoogleProviderSettings(BaseModel):

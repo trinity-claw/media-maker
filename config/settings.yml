@@ -48,6 +48,9 @@ providers:
     upload_endpoint: https://kieai.redpandaai.co/api/file-stream-upload
     video_endpoint: https://api.kie.ai/api/v1/jobs/createTask
     timeout_seconds: 240
+    request_retries: 3
+    retry_backoff_seconds: 2.0
+    poll_interval_seconds: 3
   google:
     enabled: true
     image_model: gemini-3.1-flash-image-preview

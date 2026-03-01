@@ -39,6 +39,37 @@ def _write_placeholder_image(target: Path) -> None:
     target.write_bytes(base64.b64decode(PLACEHOLDER_PNG_B64))
 
 
+def _is_transient_http_error(exc: Exception) -> bool:
+    if isinstance(exc, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
+        return True
+    if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None:
+        return int(exc.response.status_code) >= 500
+    return False
+
+
+def _request_with_retry(
+    method: str,
+    url: str,
+    *,
+    attempts: int,
+    backoff_seconds: float,
+    **kwargs: Any,
+) -> requests.Response:
+    max_attempts = max(1, int(attempts))
+    delay = max(0.5, float(backoff_seconds))
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.request(method, url, **kwargs)
+            response.raise_for_status()
+            return response
+        except Exception as exc:  # noqa: BLE001
+            if attempt == max_attempts or not _is_transient_http_error(exc):
+                raise
+            time.sleep(delay)
+            delay *= 2.0
+    raise RuntimeError("request retry exhausted without raising the original error")
+
+
 def _extract_google_inline_image(payload: dict[str, Any]) -> bytes:
     candidates = payload.get("candidates", []) or []
     for candidate in candidates:
@@ -240,8 +271,11 @@ def _generate_with_kie(
         },
         "config": {"webhookConfig": {"endpoint": "", "secret": ""}},
     }
-    task_response = requests.post(
+    task_response = _request_with_retry(
+        "POST",
         settings.providers.kie.image_endpoint,
+        attempts=settings.providers.kie.request_retries,
+        backoff_seconds=settings.providers.kie.retry_backoff_seconds,
         headers={
             "Authorization": f"Bearer {secrets.kie_api_key}",
             "Content-Type": "application/json",
@@ -249,7 +283,6 @@ def _generate_with_kie(
         json=payload,
         timeout=settings.providers.kie.timeout_seconds,
     )
-    task_response.raise_for_status()
     task_payload = task_response.json() or {}
     if int(task_payload.get("code", 500)) != 200:
         raise ValueError(task_payload.get("msg") or "Kie createTask failed")
@@ -258,15 +291,24 @@ def _generate_with_kie(
         raise ValueError("Kie createTask response missing taskId")
 
     deadline = time.time() + settings.providers.kie.timeout_seconds
+    poll_interval = max(1, int(settings.providers.kie.poll_interval_seconds))
     result_payload: dict[str, Any] | None = None
     while time.time() < deadline:
-        status_response = requests.get(
-            settings.providers.kie.task_status_endpoint,
-            headers={"Authorization": f"Bearer {secrets.kie_api_key}"},
-            params={"taskId": task_id},
-            timeout=60,
-        )
-        status_response.raise_for_status()
+        try:
+            status_response = _request_with_retry(
+                "GET",
+                settings.providers.kie.task_status_endpoint,
+                attempts=settings.providers.kie.request_retries,
+                backoff_seconds=settings.providers.kie.retry_backoff_seconds,
+                headers={"Authorization": f"Bearer {secrets.kie_api_key}"},
+                params={"taskId": task_id},
+                timeout=60,
+            )
+        except Exception as exc:  # noqa: BLE001
+            if _is_transient_http_error(exc):
+                time.sleep(poll_interval)
+                continue
+            raise
         status_payload = status_response.json() or {}
         data = status_payload.get("data", {}) or {}
         state = str(data.get("state", "")).lower()
@@ -275,7 +317,7 @@ def _generate_with_kie(
             break
         if state in {"fail", "failed"}:
             raise ValueError(data.get("failMsg") or "Kie generation failed")
-        time.sleep(3)
+        time.sleep(poll_interval)
 
     if result_payload is None:
         raise TimeoutError("Kie image generation timed out while polling task status.")
@@ -297,8 +339,13 @@ def _generate_with_kie(
     if not result_urls:
         raise ValueError("Kie task completed but no resultUrls were returned.")
     image_url = str(result_urls[0])
-    image_download = requests.get(image_url, timeout=120)
-    image_download.raise_for_status()
+    image_download = _request_with_retry(
+        "GET",
+        image_url,
+        attempts=settings.providers.kie.request_retries,
+        backoff_seconds=settings.providers.kie.retry_backoff_seconds,
+        timeout=120,
+    )
     image_bytes = image_download.content
     if post_crop_ratio:
         image_bytes = _center_crop_to_ratio(image_bytes=image_bytes, target_ratio=post_crop_ratio)

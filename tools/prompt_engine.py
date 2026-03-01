@@ -92,6 +92,7 @@ def build_prompt_variants(
     mode = str(brief.get("mode", "txt2img"))
     resolution = str(brief.get("resolution", "1024x1792"))
     aspect_ratio = str(brief.get("aspect_ratio", "4:5"))
+    frame_ratio_lock = str(brief.get("frame_ratio_lock", "") or "").strip()
     render_text = brief.get("copy_ptbr")
     source_insight = brand_context.get("source_insight", "fallback_brand_profile")
 
@@ -105,13 +106,26 @@ def build_prompt_variants(
     prompts: list[CanonicalPrompt] = []
     for idx in range(n):
         style, lighting, lens = style_variants[idx % len(style_variants)]
+        frame_ratio_sentence = ""
+        if frame_ratio_lock:
+            frame_ratio_sentence = (
+                f"Artwork ratio lock: preserve exact original artwork/frame ratio {frame_ratio_lock}; "
+                "do not stretch, crop, warp, or recompose the artwork proportions. "
+            )
         dense_prompt = (
             f"Ultra-realistic ad photo for {product}. "
             f"Visual direction: {style_hint}, variation style: {style}. "
             "Preserve natural textures and imperfections. "
             "No beautification or skin smoothing. "
+            "Artwork is printed matte canvas inside a floating black frame. "
+            "No glass cover, no acrylic sheet, no glossy laminate, no reflective front surface. "
             "Frame must be clean matte black, no metallic plate, no serial tag, no sticker label. "
+            f"{frame_ratio_sentence}"
             "Generate one single continuous photo only. No split screen, no diptych, no collage, no before-after layout. "
+            "Installation physics must be realistic: both hands in direct contact with frame edges, "
+            "fingers visibly pressing frame, no floating hand gesture, no impossible arm pose. "
+            "Subject gaze must be natural and horizontal, looking at the frame or wall area, never looking upward to ceiling. "
+            "Frame edge should visibly touch wall plane with natural shadow and perspective. "
             "Frame composition for paid social conversion. "
             "Premium aspirational environment, motivational mood, brand-safe. "
             f"Lighting: {lighting}. Camera setup: {lens}. "
@@ -136,12 +150,24 @@ def build_prompt_variants(
                 "location": "premium home-office or modern living room",
                 "lighting": {"type": lighting, "quality": "realistic non-studio"},
             },
+            "structural_preservation": {
+                "preservation_rules": [
+                    "both hands must hold the frame edges with visible physical contact",
+                    "no floating hands or disconnected gestures",
+                    "frame remains level and aligned to wall",
+                    "subject gaze should be toward frame center or straight ahead, not upward",
+                    "artwork ratio must match original reference without distortion",
+                ]
+            },
             "explicit_restrictions": {
                 "no_professional_retouching": True,
                 "no_ai_beauty_filters": True,
                 "no_studio_lighting": False,
                 "no_frame_labels_or_tags": True,
                 "no_metal_serial_plates": True,
+                "no_glass_cover": True,
+                "no_acrylic_front_sheet": True,
+                "no_glossy_reflections_on_artwork": True,
             },
         }
         canonical = normalize_prompt_schema(
@@ -152,7 +178,10 @@ def build_prompt_variants(
                 "negative_prompt": (
                     "unrealistic skin, beauty filter, plastic look, cartoon, cgi, overprocessed lighting, "
                     "silver tag on frame, metal label on frame, sticker on frame edge, split screen, diptych, "
-                    "triptych, collage layout, before-after split, two images in one frame"
+                    "triptych, collage layout, before-after split, two images in one frame, "
+                    "floating hand, hand not touching frame, impossible arm pose, disconnected limb, "
+                    "glass cover on frame, acrylic front plate, glossy poster finish, mirror-like reflection, "
+                    "strong glare hotspot on artwork, eyes looking up, subject looking at ceiling"
                 ),
                 "settings": {
                     "resolution": resolution,
@@ -171,6 +200,7 @@ def build_prompt_variants(
                     "collection": "motivacionais_inspiradores",
                     "funnel_stage": "mofu",
                     "hook_type": "status_aspiration",
+                    "frame_ratio_lock": frame_ratio_lock,
                 },
             }
         )
