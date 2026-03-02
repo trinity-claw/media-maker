@@ -68,6 +68,10 @@ cloud_sync:
   enabled: true
   root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Media Maker Outputs'
 
+local_gallery:
+  enabled: true
+  root: output/all-images
+
 assets:
   catalog_output: output/catalog/convexe-assets.json
   raw_frames_root: 'G:\.shortcut-targets-by-id\1-5LjpWVLR1Ak4WlIlo0ImeXNbnS1UiiU\Convexe Canvas\Quadros\Quadros prontos & Mock Ups'

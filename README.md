@@ -73,6 +73,7 @@ Arquivo: `config/settings.yml`
 - `providers.kie.retry_backoff_seconds`: backoff de retry
 - `providers.kie.poll_interval_seconds`: polling de task Kie
 - `cloud_sync.enabled/root`: espelho em nuvem (Google Drive local)
+- `local_gallery.enabled/root`: pasta unica local com copia de toda imagem gerada
 
 Arquivo: `config/pricing.yml`
 - tabela de custo por provider/resolucao para estimativa e guardrail
@@ -145,6 +146,10 @@ Campos operacionais esperados:
 - `Connection reset` na Kie: retries ja estao ativos em `tools/image_gen.py`; repetir lote se necessario.
 - Airtable sem anexos: conferir token/scopes e `AIRTABLE_BASE_ID`/`AIRTABLE_TABLE_ID`.
 - Resultado com visual indesejado: ajustar `--style` e rerodar variação (pipeline preserva auditoria por batch).
+
+## Galeria Local Consolidada
+- Toda imagem gerada recebe copia automatica em `output/all-images` (configuravel em `local_gallery.root`).
+- O nome inclui `batch_id` + nome original do arquivo para facilitar busca/triagem.
 
 ## Testes e CI
 Local:

@@ -128,5 +128,5 @@ single image only, no split, social conversion framing
 - Batches: `output/batches/*.json`
 - Runs: `output/runs/*.json`
 - Imagens: `output/images/<campanha>/<timestamp>/`
+- Galeria local unica (copia de todas): `output/all-images/`
 - Espelho nuvem (opcional): pasta configurada em `cloud_sync.root`
-

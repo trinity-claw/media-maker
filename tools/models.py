@@ -99,6 +99,7 @@ class GenerationItem(BaseModel):
     success: bool
     provider: str | None = None
     local_path: Path | None = None
+    local_gallery_path: str | None = None
     public_url: str | None = None
     cloud_path: str | None = None
     error: str | None = None

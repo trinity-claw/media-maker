@@ -100,6 +100,11 @@ class CloudSyncSettings(BaseModel):
     )
 
 
+class LocalGallerySettings(BaseModel):
+    enabled: bool = True
+    root: Path = Path("output/all-images")
+
+
 class AssetPathsSettings(BaseModel):
     catalog_output: Path = Path("output/catalog/convexe-assets.json")
     raw_frames_root: Path = Path(
@@ -125,6 +130,7 @@ class AppSettings(BaseModel):
     providers: ProvidersSettings = Field(default_factory=ProvidersSettings)
     airtable: AirtableSettings = Field(default_factory=AirtableSettings)
     cloud_sync: CloudSyncSettings = Field(default_factory=CloudSyncSettings)
+    local_gallery: LocalGallerySettings = Field(default_factory=LocalGallerySettings)
     assets: AssetPathsSettings = Field(default_factory=AssetPathsSettings)
 
 
@@ -180,6 +186,7 @@ def load_settings(path: Path | None = None) -> AppSettings:
     settings.paths.image_root = _resolve_path(settings.paths.image_root)
     settings.paths.video_root = _resolve_path(settings.paths.video_root)
     settings.cloud_sync.root = _resolve_path(settings.cloud_sync.root)
+    settings.local_gallery.root = _resolve_path(settings.local_gallery.root)
     settings.assets.catalog_output = _resolve_path(settings.assets.catalog_output)
     settings.assets.raw_frames_root = _resolve_path(settings.assets.raw_frames_root)
     settings.assets.mockup_angles_root = _resolve_path(settings.assets.mockup_angles_root)

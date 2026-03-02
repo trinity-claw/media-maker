@@ -317,6 +317,8 @@ def cmd_image_generate(args: argparse.Namespace) -> int:
     )
     print(f"OK: geracao concluida. Success={result.success_count}, Failures={result.failure_count}")
     print(f"Custo real acumulado: USD {result.total_cost_usd:.2f}")
+    if settings.local_gallery.enabled:
+        print(f"Galeria local consolidada: {settings.local_gallery.root}")
     print(f"Audit: {audit_path}")
     return 0
 
@@ -425,6 +427,8 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
         print(f"Frame ratio lock: {frame_ratio_lock}")
     print(f"Registros criados: {campaign['records_created']} | geradas: {result.success_count}")
     print(f"Custo estimado: USD {estimate.total_usd:.2f} | custo real: USD {result.total_cost_usd:.2f}")
+    if settings.local_gallery.enabled:
+        print(f"Galeria local consolidada: {settings.local_gallery.root}")
     print(f"Audit: {audit_path}")
     return 0
 

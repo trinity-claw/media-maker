@@ -234,6 +234,36 @@ def _sync_to_cloud(local_path: Path, settings: AppSettings, batch_id: str) -> st
     return str(target)
 
 
+def _copy_with_unique_name(source: Path, target_dir: Path, preferred_name: str) -> Path:
+    ensure_dir(target_dir)
+    candidate = target_dir / preferred_name
+    if not candidate.exists():
+        shutil.copy2(source, candidate)
+        return candidate
+    stem = candidate.stem
+    suffix = candidate.suffix
+    for index in range(2, 10000):
+        fallback = target_dir / f"{stem}-{index}{suffix}"
+        if not fallback.exists():
+            shutil.copy2(source, fallback)
+            return fallback
+    raise RuntimeError("Unable to find unique file name for local gallery copy.")
+
+
+def _sync_to_local_gallery(local_path: Path, settings: AppSettings, batch_id: str) -> str | None:
+    if not settings.local_gallery.enabled:
+        return None
+    gallery_root = settings.local_gallery.root
+    ensure_dir(gallery_root)
+    preferred_name = f"{slugify(batch_id)}-{local_path.name}"
+    target = _copy_with_unique_name(
+        source=local_path,
+        target_dir=gallery_root,
+        preferred_name=preferred_name,
+    )
+    return str(target)
+
+
 def _generate_with_kie(
     prompt: CanonicalPrompt,
     output_path: Path,
@@ -458,6 +488,12 @@ def generate_images(
 
         public_url = None
         cloud_path = None
+        local_gallery_path = None
+        local_gallery_path = _sync_to_local_gallery(
+            local_path=generated_asset.local_path,
+            settings=settings,
+            batch_id=batch_id,
+        )
         cloud_path = _sync_to_cloud(local_path=generated_asset.local_path, settings=settings, batch_id=batch_id)
         upload_error: str | None = None
         if uploader:
@@ -483,6 +519,7 @@ def generate_images(
                     success=False,
                     provider=generated_asset.provider,
                     local_path=generated_asset.local_path,
+                    local_gallery_path=local_gallery_path,
                     cloud_path=cloud_path,
                     error=error_message,
                 )
@@ -513,6 +550,7 @@ def generate_images(
                     "provider": generated_asset.provider,
                     "public_url": public_url,
                     "cloud_path": cloud_path,
+                    "local_gallery_path": local_gallery_path,
                     "cost_usd": generated_asset.cost_usd,
                 },
                 ensure_ascii=True,
@@ -528,6 +566,7 @@ def generate_images(
                 success=True,
                 provider=generated_asset.provider,
                 local_path=generated_asset.local_path,
+                local_gallery_path=local_gallery_path,
                 public_url=public_url,
                 cloud_path=cloud_path,
                 cost_usd=generated_asset.cost_usd,
