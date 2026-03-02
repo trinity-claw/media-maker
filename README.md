@@ -92,6 +92,11 @@ python -m tools.cli status
 python -m tools.cli video generate --from-approved --confirm-cost
 ```
 
+Para travar proporcao real do quadro manualmente, use:
+```powershell
+python -m tools.cli ingest run --frame-number 107 --frame-ratio-lock 2:1 --variations 4 --confirm-cost
+```
+
 ## Fluxo recomendado (producao)
 1. `python -m tools.cli validate-config`
 2. `python -m tools.cli airtable setup` (uma vez, ou quando schema mudar)

@@ -55,6 +55,11 @@ python -m tools.cli ingest run ^
   --confirm-cost
 ```
 
+Se precisar forcar a proporcao exata do quadro (ex.: 1,20x0,60 = `2:1`):
+```powershell
+python -m tools.cli ingest run --frame-number 107 --frame-ratio-lock 2:1 --variations 4 --confirm-cost
+```
+
 ### O que acontece internamente
 1. Resolve contexto Convexe (repo irmao, quando disponivel).
 2. Sobe mockups para URL publica.

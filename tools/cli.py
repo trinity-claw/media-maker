@@ -247,7 +247,7 @@ def cmd_campaign_create(args: argparse.Namespace) -> int:
         batch_id=args.batch_id,
         primary_provider=args.primary_provider,
         reference_urls=args.reference or [],
-        frame_ratio_lock=None,
+        frame_ratio_lock=args.frame_ratio_lock,
         settings=settings,
         pricing=pricing,
         client=client,
@@ -257,6 +257,8 @@ def cmd_campaign_create(args: argparse.Namespace) -> int:
     print(f"OK: campanha criada. Batch ID: {result['batch_id']}")
     print(f"Registros Airtable criados: {result['records_created']}")
     print(f"Custo estimado total: USD {result['estimate'].total_usd:.2f}")
+    if args.frame_ratio_lock:
+        print(f"Frame ratio lock: {args.frame_ratio_lock}")
     print(f"Batch salvo em: {result['batch_path']}")
     return 0
 
@@ -357,7 +359,10 @@ def cmd_ingest_run(args: argparse.Namespace) -> int:
         product=args.product,
     )
     all_mockup_paths = list(args.mockup_path or []) + auto_paths
-    frame_ratio_lock = infer_frame_ratio_from_mockup_paths(all_mockup_paths)
+    ratio_probe_paths = list(all_mockup_paths)
+    if catalog_frame:
+        ratio_probe_paths.extend(list((catalog_frame.get("assets", {}) or {}).get("raw", [])))
+    frame_ratio_lock = args.frame_ratio_lock or infer_frame_ratio_from_mockup_paths(ratio_probe_paths)
     reference_urls = prepare_reference_urls(
         mockup_paths=all_mockup_paths,
         mockup_urls=args.mockup_url or [],
@@ -521,6 +526,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_campaign_create.add_argument("--resolution", default=None)
     p_campaign_create.add_argument("--aspect-ratio", default=None)
     p_campaign_create.add_argument("--copy-text", default=None)
+    p_campaign_create.add_argument("--frame-ratio-lock", default=None)
     p_campaign_create.add_argument("--batch-id", default=None)
     p_campaign_create.add_argument("--primary-provider", default=None, choices=["kie", "google"])
     p_campaign_create.add_argument("--reference", action="append", default=[])
@@ -551,6 +557,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest_run.add_argument("--resolution", default=None)
     p_ingest_run.add_argument("--aspect-ratio", default=None)
     p_ingest_run.add_argument("--copy-text", default=None)
+    p_ingest_run.add_argument("--frame-ratio-lock", default=None)
     p_ingest_run.add_argument("--batch-id", default=None)
     p_ingest_run.add_argument("--primary-provider", default=None, choices=["kie", "google"])
     p_ingest_run.add_argument("--mockup-path", action="append", default=[])
